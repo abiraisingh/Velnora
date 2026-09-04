@@ -2,37 +2,75 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, BarChart3, Check, LogOut, Package, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  getMessages,
-  getOrders,
-  getSession,
-  signOut,
-  updateOrderStatus,
-  type Order,
-  type OrderStatus,
-} from "../lib/store";
+import { getAdminData, updateOrderStatus as updateOrderStatusServer } from "../lib/server-api";
+import { getAccessToken, getCurrentProfile, supabase } from "../lib/supabase";
+import type { Order, OrderStatus, ContactMessage } from "../lib/store";
 
 export const Route = createFileRoute("/admin")({ component: Admin });
 
-const statuses: OrderStatus[] = ["pending", "confirmed", "shipped", "delivered"];
+const statuses: OrderStatus[] = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
 
 function Admin() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [messages, setMessages] = useState(getMessages());
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    const session = getSession();
-    if (session && "role" in session && session.role === "admin") setAuthenticated(true);
-    else navigate({ to: "/" });
-    const refresh = () => {
-      setOrders(getOrders());
-      setMessages(getMessages());
+    let active = true;
+    getCurrentProfile()
+      .then(async (profile) => {
+        if (!profile || profile.role !== "admin") {
+          toast.error("Admin access required.");
+          navigate({ to: "/" });
+          return;
+        }
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
+        const data = await getAdminData({ data: { accessToken } });
+        if (!active) return;
+        setOrders(
+          (data.orders ?? []).map((order) => ({
+            id: order.id,
+            customer: order.customer_name,
+            customerEmail: order.customer_email,
+            phone: order.phone,
+            address: order.address,
+            product: Array.isArray(order.items)
+              ? order.items
+                  .map(
+                    (item: { product: string; quantity: number }) =>
+                      `${item.product} x${item.quantity}`,
+                  )
+                  .join(", ")
+              : "Order items",
+            quantity: 1,
+            total: order.total,
+            paymentMethod: order.payment_method,
+            paymentStatus: order.payment_status,
+            status: order.status,
+            createdAt: order.created_at,
+          })) as Order[],
+        );
+        setMessages(
+          (data.messages ?? []).map((message) => ({
+            id: message.id,
+            name: message.name,
+            email: message.email,
+            message: message.message,
+            status: message.status,
+            createdAt: message.created_at,
+          })) as ContactMessage[],
+        );
+        setAuthenticated(true);
+      })
+      .catch(() => {
+        toast.error("Unable to load admin data.");
+        navigate({ to: "/" });
+      });
+    return () => {
+      active = false;
     };
-    refresh();
-    window.addEventListener("velnora-store", refresh);
-    return () => window.removeEventListener("velnora-store", refresh);
   }, [navigate]);
 
   if (!authenticated) return null;
@@ -40,10 +78,18 @@ function Admin() {
   const pending = orders.filter((order) => order.status === "pending").length;
   const upi = orders.filter((order) => order.paymentMethod === "upi").length;
 
-  const changeStatus = (order: Order, status: OrderStatus) => {
-    updateOrderStatus(order.id, status);
-    setOrders(getOrders());
-    toast(`Order ${order.id} marked ${status}.`);
+  const changeStatus = async (order: Order, status: OrderStatus) => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) return;
+    try {
+      await updateOrderStatusServer({ data: { accessToken, orderId: order.id, status } });
+      setOrders((current) =>
+        current.map((item) => (item.id === order.id ? { ...item, status } : item)),
+      );
+      toast(`Order ${order.id} marked ${status}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update order.");
+    }
   };
 
   const metrics: { label: string; value: string | number; Icon: LucideIcon }[] = [
@@ -69,8 +115,8 @@ function Admin() {
           </p>
         </div>
         <button
-          onClick={() => {
-            signOut();
+          onClick={async () => {
+            await supabase.auth.signOut();
             navigate({ to: "/" });
           }}
           className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-card"

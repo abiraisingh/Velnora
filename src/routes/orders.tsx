@@ -2,7 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Package, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { getOrders, getSession, type Order } from "../lib/store";
+import { getMyOrders } from "../lib/server-api";
+import { getAccessToken, getCurrentProfile } from "../lib/supabase";
+import type { Order } from "../lib/store";
 
 export const Route = createFileRoute("/orders")({ component: Orders });
 
@@ -11,18 +13,48 @@ function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
-    const session = getSession();
-    if (!session || !("email" in session)) {
-      toast.error("Please sign in to view your orders.");
-      navigate({ to: "/" });
-      return;
-    }
-    setSignedIn(true);
-    const refresh = () =>
-      setOrders(getOrders().filter((order) => order.customerEmail === session.email));
-    refresh();
-    window.addEventListener("velnora-store", refresh);
-    return () => window.removeEventListener("velnora-store", refresh);
+    let active = true;
+    getCurrentProfile()
+      .then(async (profile) => {
+        if (!profile) {
+          toast.error("Please sign in to view your orders.");
+          navigate({ to: "/" });
+          return;
+        }
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
+        const data = await getMyOrders({ data: { accessToken } });
+        if (active) {
+          setOrders(
+            (data ?? []).map((order) => ({
+              id: order.id,
+              customer: order.customer_name,
+              customerEmail: order.customer_email,
+              phone: order.phone,
+              address: order.address,
+              product: Array.isArray(order.items)
+                ? order.items
+                    .map(
+                      (item: { product: string; quantity: number }) =>
+                        `${item.product} x${item.quantity}`,
+                    )
+                    .join(", ")
+                : "Order items",
+              quantity: 1,
+              total: order.total,
+              paymentMethod: order.payment_method,
+              paymentStatus: order.payment_status,
+              status: order.status,
+              createdAt: order.created_at,
+            })) as Order[],
+          );
+          setSignedIn(true);
+        }
+      })
+      .catch(() => toast.error("Unable to load your orders."));
+    return () => {
+      active = false;
+    };
   }, [navigate]);
   if (!signedIn) return null;
   return (

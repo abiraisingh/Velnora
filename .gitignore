@@ -10,6 +10,10 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
+.cache
+.vite
+*.tsbuildinfo
 .output
 .vinxi
 .tanstack/**
@@ -22,6 +26,13 @@ dist-ssr
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
 
 # Editor directories and files
 .vscode/*

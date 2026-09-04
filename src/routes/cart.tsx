@@ -2,14 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  clearCart,
-  createOrder,
-  getCart,
-  getSession,
-  updateCartQuantity,
-  type CartItem,
-} from "../lib/store";
+import { clearCart, getCart, updateCartQuantity, type CartItem } from "../lib/store";
+import { createCheckoutOrder } from "../lib/server-api";
+import { getAccessToken, getCurrentProfile, getCurrentUser } from "../lib/supabase";
+import { openCashfreeCheckout } from "../lib/cashfree";
 
 export const Route = createFileRoute("/cart")({ component: Cart });
 
@@ -19,22 +15,29 @@ function Cart() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "" });
   const [payment, setPayment] = useState<"cod" | "upi">("cod");
   useEffect(() => {
-    const session = getSession();
-    if (!session || !("email" in session)) {
-      toast.error("Please sign in to view your cart.");
-      navigate({ to: "/" });
-      return;
-    }
-    setItems(getCart());
-    setForm((current) => ({ ...current, name: session.name, email: session.email }));
+    let active = true;
+    Promise.all([getCurrentProfile(), getCurrentUser()]).then(([profile, user]) => {
+      if (!active) return;
+      if (!profile) {
+        toast.error("Please sign in to view your cart.");
+        navigate({ to: "/" });
+        return;
+      }
+      setItems(getCart());
+      setForm((current) => ({ ...current, name: profile.name, email: user?.email ?? "" }));
+    });
     const refresh = () => setItems(getCart());
     window.addEventListener("velnora-store", refresh);
-    return () => window.removeEventListener("velnora-store", refresh);
+    return () => {
+      active = false;
+      window.removeEventListener("velnora-store", refresh);
+    };
   }, [navigate]);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!getSession()) {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
       toast.error("Please sign in before placing an order.");
       return;
     }
@@ -42,21 +45,28 @@ function Cart() {
       toast.error("Complete your delivery details first.");
       return;
     }
-    const first = items[0];
-    if (!first) return;
-    createOrder({
-      customer: form.name,
-      customerEmail: form.email,
-      phone: form.phone,
-      address: form.address,
-      product: items.map((item) => `${item.product} x${item.quantity}`).join(", "),
-      quantity: items.reduce((sum, item) => sum + item.quantity, 0),
-      total,
-      paymentMethod: payment,
-    });
-    clearCart();
-    setItems([]);
-    toast.success("Your order has been received.");
+    try {
+      const result = await createCheckoutOrder({
+        data: {
+          accessToken,
+          customerName: form.name,
+          customerEmail: form.email,
+          phone: form.phone,
+          address: form.address,
+          items: items.map((item) => ({ product: item.product, quantity: item.quantity })),
+          paymentMethod: payment,
+        },
+      });
+      if (payment === "upi" && result.paymentSessionId) {
+        await openCashfreeCheckout(result.paymentSessionId);
+        return;
+      }
+      clearCart();
+      setItems([]);
+      toast.success(`Your order ${result.orderId} has been received.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to place order.");
+    }
   };
   return (
     <main className="min-h-screen bg-background px-5 py-8 sm:px-10">

@@ -17,16 +17,11 @@ import {
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
-import {
-  addToCart,
-  createMessage,
-  createOrder,
-  getSession,
-  signIn,
-  signOut,
-  signUp,
-} from "../lib/store";
+import { useEffect, useState } from "react";
+import { addToCart } from "../lib/store";
+import { createCheckoutOrder, createContactMessage, getCurrentProfile } from "../lib/server-api";
+import { getAccessToken, isSupabaseConfigured, supabase, type Profile } from "../lib/supabase";
+import { openCashfreeCheckout } from "../lib/cashfree";
 
 import heroCandle from "@/assets/hero-candle.jpg";
 import roseImg from "@/assets/rose.jpg";
@@ -112,25 +107,48 @@ function BuyButton({ name, price, image }: { name: string; price: string; image:
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
   const [form, setForm] = useState({ customer: "", customerEmail: "", phone: "", address: "" });
   const total = Number(price.replace(/[^0-9]/g, ""));
-  const requireSignIn = () => {
-    if (getSession()) return true;
+  const requireSignIn = async () => {
+    if (await getAccessToken()) return true;
     toast.error("Please sign in before shopping.");
     return false;
   };
-  const add = () => {
-    if (!requireSignIn()) return;
+  const add = async () => {
+    if (!(await requireSignIn())) return;
     addToCart({ product: name, image, price: total });
     toast.success(`${name} added to cart.`);
   };
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.customer || !form.customerEmail || !form.phone || !form.address) {
       toast.error("Please complete your delivery details.");
       return;
     }
-    const order = createOrder({ ...form, product: name, quantity: 1, total, paymentMethod });
-    setSubmitted(true);
-    toast.success(`Order ${order.id} received.`);
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      toast.error("Please sign in before placing an order.");
+      return;
+    }
+    try {
+      const order = await createCheckoutOrder({
+        data: {
+          accessToken,
+          customerName: form.customer,
+          customerEmail: form.customerEmail,
+          phone: form.phone,
+          address: form.address,
+          items: [{ product: name, quantity: 1 }],
+          paymentMethod,
+        },
+      });
+      if (paymentMethod === "upi" && order.paymentSessionId) {
+        await openCashfreeCheckout(order.paymentSessionId);
+        return;
+      }
+      setSubmitted(true);
+      toast.success(`Order ${order.orderId} received.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to place order.");
+    }
   };
 
   return (
@@ -143,8 +161,8 @@ function BuyButton({ name, price, image }: { name: string; price: string; image:
         Add to cart
       </button>
       <button
-        onClick={() => {
-          if (requireSignIn()) setOpen(true);
+        onClick={async () => {
+          if (await requireSignIn()) setOpen(true);
         }}
         className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
       >
@@ -245,12 +263,17 @@ function BuyButton({ name, price, image }: { name: string; price: string; image:
 function ReachUsForm() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [sent, setSent] = useState(false);
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    createMessage(form);
-    setForm({ name: "", email: "", message: "" });
-    setSent(true);
-    toast.success("Your message is on its way.");
+    try {
+      const accessToken = await getAccessToken();
+      await createContactMessage({ data: { ...form, accessToken: accessToken ?? undefined } });
+      setForm({ name: "", email: "", message: "" });
+      setSent(true);
+      toast.success("Your message is on its way.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send your message.");
+    }
   };
 
   return (
@@ -315,24 +338,58 @@ function ReachUsForm() {
 }
 
 function AccountPanel() {
-  const [session, setSession] = useState(getSession());
+  const [session, setSession] = useState<Profile | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const submit = (event: React.FormEvent) => {
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const loadProfile = async () => {
+      const accessToken = await getAccessToken();
+      if (accessToken) setSession(await getCurrentProfile({ data: { accessToken } }));
+    };
+    void loadProfile();
+    const { data } = supabase.auth.onAuthStateChange(() => void loadProfile());
+    return () => data.subscription.unsubscribe();
+  }, []);
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!isSupabaseConfigured) {
+      toast.error("Account sign-in is not configured. Add the Supabase values to .env.");
+      return;
+    }
     try {
-      const next =
+      const result =
         mode === "signin"
-          ? signIn(form.email, form.password)
-          : signUp(form.name, form.email, form.password);
+          ? await supabase.auth.signInWithPassword({ email: form.email, password: form.password })
+          : await supabase.auth.signUp({
+              email: form.email,
+              password: form.password,
+              options: { data: { name: form.name } },
+            });
+      if (result.error) throw result.error;
+      const next = await getCurrentProfile({
+        data: { accessToken: result.data.session?.access_token ?? "" },
+      });
       setSession(next);
       setOpen(false);
       toast.success(
         mode === "signin" ? "Welcome back to Velnora." : "Your Velnora account is ready.",
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to sign in.");
+      const status =
+        error && typeof error === "object" && "status" in error && typeof error.status === "number"
+          ? error.status
+          : null;
+      const message =
+        status === 429
+          ? "Too many signup attempts. Please wait a few minutes before trying again."
+          : status === 400 && mode === "signin"
+            ? "Email or password is incorrect."
+            : error instanceof Error
+              ? error.message
+              : "Unable to sign in.";
+      toast.error(message);
     }
   };
   const isAdmin = session && "role" in session && session.role === "admin";
@@ -362,8 +419,8 @@ function AccountPanel() {
             </a>
           )}
           <button
-            onClick={() => {
-              signOut();
+            onClick={async () => {
+              await supabase.auth.signOut();
               setSession(null);
             }}
             className="text-sm text-muted-foreground hover:text-primary"
