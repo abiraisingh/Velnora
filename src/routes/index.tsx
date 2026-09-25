@@ -15,6 +15,7 @@ import {
   User,
   LogIn,
   Send,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
@@ -510,15 +511,22 @@ function AccountPanel() {
 }
 
 function Index() {
+  const showReachUsForm = false;
+
   return (
     <main className="mx-auto max-w-6xl px-5 pb-0 pt-8 sm:px-8">
       <nav className="mb-8 flex items-center justify-end gap-5 text-sm text-muted-foreground">
         <a href="#shop" className="hover:text-primary">
           Shop
         </a>
-        <a href="#reach-us" className="hover:text-primary">
-          Reach us
-        </a>
+        {showReachUsForm && (
+          <a href="#reach-us" className="hover:text-primary">
+            Reach us
+          </a>
+        )}
+        <Link to="/contact" className="hover:text-primary">
+          Contact
+        </Link>
         <Link to="/orders" className="hover:text-primary">
           My orders
         </Link>
@@ -654,7 +662,40 @@ function Index() {
         ))}
       </section>
 
-      <ReachUsForm />
+      {showReachUsForm && <ReachUsForm />}
+
+      <section className="mt-12 grid gap-8 border-y border-border py-10 md:grid-cols-[1fr_auto] md:items-center">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">
+            Get in touch
+          </p>
+          <h3 className="mt-3 max-w-xl font-display text-3xl leading-tight text-primary sm:text-4xl">
+            Connect us through whatsapp and instagram
+          </h3>
+          <p className="mt-3 max-w-lg text-sm leading-7 text-muted-foreground">
+            Have a question about a candle, an order, or choosing a scent? Send us a message or
+            follow along for a little more Velnora in your day.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <a
+            href="https://wa.me/919149744806"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <MessageCircle className="h-4 w-4" /> WhatsApp
+          </a>
+          <a
+            href="https://instagram.com/velnora131"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-primary px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+          >
+            <Instagram className="h-4 w-4" /> Instagram
+          </a>
+        </div>
+      </section>
 
       <AccountPanel />
 

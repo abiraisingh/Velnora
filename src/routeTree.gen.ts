@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CartRouteImport } from './routes/cart'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PaymentResultRouteImport } from './routes/payment-result'
 import { Route as ApiPaymentWebhookRouteImport } from './routes/api/payment/webhook'
@@ -29,6 +30,11 @@ const AdminRoute = AdminRouteImport.update({
 const CartRoute = CartRouteImport.update({
   id: '/cart',
   path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
+  '/contact': typeof ContactRoute
   '/orders': typeof OrdersRoute
   '/payment-result': typeof PaymentResultRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
+  '/contact': typeof ContactRoute
   '/orders': typeof OrdersRoute
   '/payment-result': typeof PaymentResultRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
+  '/contact': typeof ContactRoute
   '/orders': typeof OrdersRoute
   '/payment-result': typeof PaymentResultRoute
   '/api/payment/webhook': typeof ApiPaymentWebhookRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/cart'
+    | '/contact'
     | '/orders'
     | '/payment-result'
     | '/api/payment/webhook'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/cart'
+    | '/contact'
     | '/orders'
     | '/payment-result'
     | '/api/payment/webhook'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/cart'
+    | '/contact'
     | '/orders'
     | '/payment-result'
     | '/api/payment/webhook'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   CartRoute: typeof CartRoute
+  ContactRoute: typeof ContactRoute
   OrdersRoute: typeof OrdersRoute
   PaymentResultRoute: typeof PaymentResultRoute
   ApiPaymentWebhookRoute: typeof ApiPaymentWebhookRoute
@@ -129,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/cart'
       fullPath: '/cart'
       preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   CartRoute: CartRoute,
+  ContactRoute: ContactRoute,
   OrdersRoute: OrdersRoute,
   PaymentResultRoute: PaymentResultRoute,
   ApiPaymentWebhookRoute: ApiPaymentWebhookRoute,
