@@ -173,6 +173,9 @@ function Admin() {
                     <td className="py-4">
                       {order.customer}
                       <div className="text-xs text-muted-foreground">{order.phone}</div>
+                      <div className="mt-1 max-w-xs whitespace-normal break-words text-xs leading-5 text-muted-foreground">
+                        {order.address}
+                      </div>
                     </td>
                     <td className="py-4 uppercase text-xs">{order.paymentMethod}</td>
                     <td className="py-4">₹{order.total.toLocaleString("en-IN")}</td>

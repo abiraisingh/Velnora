@@ -188,10 +188,14 @@ function Cart() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPayment("upi")}
-                  className={`rounded-lg border px-3 py-3 text-xs ${payment === "upi" ? "border-primary bg-secondary" : "border-input"}`}
+                  onClick={() =>
+                    toast.info(
+                      "UPI services will be enabled soon. You can continue shopping using COD method. Thank you for shopping with us. 🕯️✨",
+                    )
+                  }
+                  className="rounded-lg border border-input px-3 py-3 text-xs text-muted-foreground"
                 >
-                  UPI
+                  UPI (coming soon)
                 </button>
               </div>
               <div className="mt-6 flex justify-between border-t border-border pt-4">

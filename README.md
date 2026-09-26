@@ -7,7 +7,7 @@ A calm storefront for handcrafted scented candles.
 - Product catalogue with Rose, Jasmine, and Mogra candles
 - Account creation and sign-in
 - Login-protected cart and checkout
-- Cash on delivery and UPI order selection
+- Cash on delivery checkout (UPI coming soon)
 - Customer order history at `/orders`
 - Reach-us contact form
 - Admin operations dashboard at `/admin`
@@ -44,7 +44,7 @@ npm run preview
 - Supabase Auth manages accounts and persistent sessions.
 - Supabase PostgreSQL stores profiles, orders, and contact messages.
 - Row Level Security limits customers to their own orders and reserves management operations for admins.
-- Cashfree Sandbox creates and verifies UPI payments server-side.
+- Cashfree Sandbox integration is implemented server-side; UPI checkout is currently disabled.
 - Cashfree webhooks update payment state idempotently after signature verification.
 - `localStorage` is used only for the temporary cart; it is never the source of truth for users, orders, or payments.
 

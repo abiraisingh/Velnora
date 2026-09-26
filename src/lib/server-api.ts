@@ -105,6 +105,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
     const client = await supabaseForUser(data.accessToken);
     const { data: userData, error: userError } = await client.auth.getUser(data.accessToken);
     if (userError || !userData.user) throw new Error("Authentication required.");
+    if (data.paymentMethod === "upi") throw new Error("UPI payments are coming soon.");
     const total = data.items.reduce((sum, item) => {
       const price = products[item.product];
       if (!price) throw new Error("Invalid product.");

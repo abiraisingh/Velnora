@@ -238,17 +238,16 @@ function BuyButton({ name, price, image }: { name: string; price: string; image:
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod("upi")}
-                    className={`rounded-lg border px-3 py-3 text-sm ${paymentMethod === "upi" ? "border-primary bg-secondary" : "border-input"}`}
+                    onClick={() =>
+                      toast.info(
+                        "UPI services will be enabled soon. You can continue shopping using COD method. Thank you for shopping with us. 🕯️✨",
+                      )
+                    }
+                    className="rounded-lg border border-input px-3 py-3 text-sm text-muted-foreground"
                   >
-                    UPI
+                    UPI (coming soon)
                   </button>
                 </div>
-                {paymentMethod === "upi" && (
-                  <p className="rounded-lg bg-secondary p-3 text-xs leading-5 text-muted-foreground">
-                    UPI payment details will be shared by our team after your order is verified.
-                  </p>
-                )}
                 <button className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
                   Place order for ₹{total}
                 </button>
@@ -366,9 +365,19 @@ function AccountPanel() {
           : await supabase.auth.signUp({
               email: form.email,
               password: form.password,
-              options: { data: { name: form.name } },
+              options: {
+                data: { name: form.name },
+                emailRedirectTo: window.location.origin,
+              },
             });
       if (result.error) throw result.error;
+      if (mode === "signup" && !result.data.session) {
+        setOpen(false);
+        toast.success(
+          "Account created. Check your email and click the verification link before signing in.",
+        );
+        return;
+      }
       const next = await getCurrentProfile({
         data: { accessToken: result.data.session?.access_token ?? "" },
       });
@@ -514,28 +523,55 @@ function Index() {
   const showReachUsForm = false;
 
   return (
-    <main className="mx-auto max-w-6xl px-5 pb-0 pt-8 sm:px-8">
-      <nav className="mb-8 flex items-center justify-end gap-5 text-sm text-muted-foreground">
-        <a href="#shop" className="hover:text-primary">
-          Shop
-        </a>
-        {showReachUsForm && (
-          <a href="#reach-us" className="hover:text-primary">
-            Reach us
-          </a>
-        )}
-        <Link to="/contact" className="hover:text-primary">
-          Contact
-        </Link>
-        <Link to="/orders" className="hover:text-primary">
-          My orders
-        </Link>
+    <main className="mx-auto max-w-6xl px-5 pb-0 pt-0 sm:px-8">
+      <nav className="storefront-nav mb-8 flex flex-wrap items-center justify-between gap-y-2 py-3 text-sm text-muted-foreground">
         <Link
-          to="/cart"
-          className="inline-flex items-center gap-2 font-semibold text-primary hover:text-accent"
+          to="/"
+          aria-label="Velnora Candles home"
+          className="flex shrink-0 items-center gap-2.5 rounded-md pr-3 transition-colors hover:opacity-80"
         >
-          <ShoppingBag className="h-4 w-4" /> Cart
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary">
+            <Flame className="h-5 w-5 text-accent" />
+          </span>
+          <span className="flex flex-col leading-none">
+            <span className="font-display text-xl text-primary">velnora</span>
+            <span className="mt-1 text-[0.55rem] text-muted-foreground">SCENTED CANDLES</span>
+          </span>
         </Link>
+        <div className="flex w-full items-center justify-between gap-1 sm:w-auto sm:justify-end sm:gap-2">
+          <a
+            href="#shop"
+            className="rounded-md px-2.5 py-2 transition-colors hover:bg-secondary hover:text-primary"
+          >
+            Shop
+          </a>
+          {showReachUsForm && (
+            <a
+              href="#reach-us"
+              className="rounded-md px-2.5 py-2 transition-colors hover:bg-secondary hover:text-primary"
+            >
+              Reach us
+            </a>
+          )}
+          <Link
+            to="/contact"
+            className="rounded-md px-2.5 py-2 transition-colors hover:bg-secondary hover:text-primary"
+          >
+            Contact
+          </Link>
+          <Link
+            to="/orders"
+            className="rounded-md px-2.5 py-2 transition-colors hover:bg-secondary hover:text-primary"
+          >
+            My orders
+          </Link>
+          <Link
+            to="/cart"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 font-semibold text-primary transition-colors hover:bg-secondary hover:text-accent"
+          >
+            <ShoppingBag className="h-4 w-4" /> Cart
+          </Link>
+        </div>
       </nav>
       {/* Hero */}
       <section className="grid items-center gap-10 md:grid-cols-2">

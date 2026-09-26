@@ -33,13 +33,29 @@ export const Route = createFileRoute("/api/payment/webhook")({
           return new Response("Invalid signature", { status: 401 });
         const payload = JSON.parse(body) as {
           data?: {
-            order?: { order_id?: string };
-            payment?: { cf_payment_id?: string; payment_status?: string };
+            order?: { order_id?: string; order_amount?: number; order_currency?: string };
+            payment?: {
+              cf_payment_id?: string;
+              payment_status?: string;
+              payment_amount?: number;
+              payment_currency?: string;
+            };
           };
         };
         const orderId = payload.data?.order?.order_id;
+        const orderAmount = payload.data?.order?.order_amount;
+        const orderCurrency = payload.data?.order?.order_currency;
         const payment = payload.data?.payment;
-        if (!orderId || !payment) return new Response("Invalid payload", { status: 400 });
+        if (
+          !orderId ||
+          !payment ||
+          typeof orderAmount !== "number" ||
+          typeof payment.payment_amount !== "number" ||
+          orderAmount !== payment.payment_amount ||
+          orderCurrency !== "INR" ||
+          payment.payment_currency !== "INR"
+        )
+          return new Response("Invalid payload", { status: 400 });
         const paymentStatus =
           payment.payment_status === "SUCCESS"
             ? "paid"
@@ -49,13 +65,23 @@ export const Route = createFileRoute("/api/payment/webhook")({
         const supabase = createClient(env("VITE_SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
           auth: { persistSession: false, autoRefreshToken: false },
         });
+        const { data: order, error: lookupError } = await supabase
+          .from("orders")
+          .select("id,total,payment_method,payment_status")
+          .eq("id", orderId)
+          .single();
+        if (lookupError || !order) return new Response("Order not found", { status: 404 });
+        if (order.payment_method !== "upi" || order.total !== orderAmount)
+          return new Response("Order amount mismatch", { status: 400 });
+        if (order.payment_status === "paid") return Response.json({ received: true });
         const { error } = await supabase
           .from("orders")
           .update({
             payment_status: paymentStatus,
             cashfree_payment_id: payment.cf_payment_id ?? null,
           })
-          .eq("id", orderId);
+          .eq("id", orderId)
+          .neq("payment_status", "paid");
         if (error) return new Response("Unable to update order", { status: 500 });
         return Response.json({ received: true });
       },

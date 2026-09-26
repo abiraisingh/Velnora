@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "../components/ui/sonner";
@@ -127,9 +127,58 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const [showIntro, setShowIntro] = useState(true);
+  const [introExiting, setIntroExiting] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShowIntro(false);
+      return;
+    }
+
+    const exitTimer = window.setTimeout(() => setIntroExiting(true), 2600);
+    const removeTimer = window.setTimeout(() => setShowIntro(false), 3000);
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(removeTimer);
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
+      {showIntro && (
+        <div
+          className={`brand-intro${introExiting ? " brand-intro--exiting" : ""}`}
+          role="status"
+          aria-label="Velnora Candles"
+        >
+          <div className="brand-intro__content">
+            <div className="brand-intro__scene" aria-hidden="true">
+              <span className="brand-intro__orbit brand-intro__orbit--outer" />
+              <span className="brand-intro__orbit brand-intro__orbit--inner" />
+              <span className="brand-intro__candle">
+                <span className="brand-intro__wick" />
+                <span className="brand-intro__flame" />
+                <span className="brand-intro__vessel">
+                  <span className="brand-intro__vessel-mark">V</span>
+                </span>
+              </span>
+            </div>
+            <p className="brand-intro__name" aria-hidden="true">
+              {"VELNORA".split("").map((letter, index) => (
+                <span
+                  key={`${letter}-${index}`}
+                  style={{ animationDelay: `${550 + index * 100}ms` }}
+                >
+                  {letter}
+                </span>
+              ))}
+            </p>
+            <span className="brand-intro__rule" aria-hidden="true" />
+            <p className="brand-intro__descriptor">LIGHT. BREATHE. UNWIND.</p>
+          </div>
+        </div>
+      )}
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster position="top-center" />
